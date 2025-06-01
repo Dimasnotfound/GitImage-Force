@@ -11,7 +11,7 @@
 
 ## 🖼️ Demo Antarmuka
 
-![preview](https://user-images.githubusercontent.com/your-username/sample-demo.png) <!-- Ganti dengan tangkapan layar aktual bila ada -->
+![Screenshot_13.png](https://raw.githubusercontent.com/Dimasnotfound/GitImage-Force/main/images/Screenshot_13.png)
 
 ## 📦 Cara Menggunakan
 
