@@ -22,43 +22,57 @@
       margin-top: 10px;
     }
     .result {
-      word-break: break-all;
+      word-break: break-word;
       background-color: #e2e8f0;
       padding: 10px;
       border-radius: 8px;
       margin-top: 10px;
     }
+    .drop-area {
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      color: #718096;
+      cursor: pointer;
+    }
+    .drop-area.dragover {
+      background-color: #edf2f7;
+    }
   </style>
 </head>
 <body>
   <div class="container mx-auto p-6 bg-white shadow-lg rounded-lg">
-    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">GitHub Image Uploader</h1>
-    
+    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">GitImage Force</h1>
+
     <div class="mb-4">
       <label class="block text-gray-700 font-semibold mb-2" for="token">GitHub Personal Access Token</label>
       <input type="text" id="token" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter your GitHub PAT">
       <p class="text-sm text-gray-500 mt-1">Create a token with 'repo' scope at <a href="https://github.com/settings/tokens" target="_blank" class="text-blue-600 hover:underline">GitHub Settings</a></p>
     </div>
-    
+
     <div class="mb-4">
       <label class="block text-gray-700 font-semibold mb-2" for="repo">Repository Name</label>
       <input type="text" id="repo" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., username/repo">
     </div>
-    
+
     <div class="mb-4">
-      <label class="block text-gray-700 font-semibold mb-2" for="file">Upload Image</label>
-      <input type="file" id="file" accept="image/*" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <label class="block text-gray-700 font-semibold mb-2">Upload Image(s)</label>
+      <div id="dropArea" class="drop-area">Drag & Drop Images Here or Click to Select</div>
+      <input type="file" id="file" accept="image/*" multiple class="hidden">
       <div id="preview" class="preview mt-2"></div>
+      <button id="resetBtn" class="mt-2 text-sm text-red-600 hover:underline">Reset Images</button>
     </div>
-    
-    <button id="uploadBtn" class="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition duration-300">Upload Image</button>
-    
+
+    <button id="uploadBtn" class="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition duration-300">Upload Image(s)</button>
+
     <div id="result" class="result hidden">
       <h3 class="text-lg font-semibold text-gray-800">Result</h3>
-      <p id="imageUrl" class="text-gray-700"></p>
-      <p class="text-sm text-gray-500 mt-2">Copy this URL to your README.md to display the image:</p>
-      <p id="markdown" class="text-gray-700 font-mono"></p>
+      <div id="resultContent"></div>
+      <p class="text-sm text-gray-500 mt-2">Copy the URLs or Markdown to use in your README.md</p>
     </div>
+
+    <p class="text-xs text-center text-gray-500 mt-6">Made with ❤️ by <a href="https://github.com/Dimasnotfound" target="_blank" class="underline">Dimasnotfound</a></p>
   </div>
 
   <script>
@@ -68,76 +82,105 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const preview = document.getElementById('preview');
     const result = document.getElementById('result');
-    const imageUrl = document.getElementById('imageUrl');
-    const markdown = document.getElementById('markdown');
+    const resultContent = document.getElementById('resultContent');
+    const dropArea = document.getElementById('dropArea');
+    const resetBtn = document.getElementById('resetBtn');
 
-    // Preview image before upload
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          preview.innerHTML = `<img src="${e.target.result}" alt="Image Preview">`;
-        };
-        reader.readAsDataURL(file);
-      } else {
-        preview.innerHTML = '';
-      }
+    let files = [];
+
+    dropArea.addEventListener('click', () => fileInput.click());
+
+    dropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropArea.classList.add('dragover');
     });
 
-    // Upload image to GitHub
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('dragover'));
+
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropArea.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    resetBtn.addEventListener('click', () => {
+      files = [];
+      preview.innerHTML = '';
+      fileInput.value = '';
+    });
+
+    function handleFiles(selectedFiles) {
+      files = [...selectedFiles];
+      preview.innerHTML = '';
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     uploadBtn.addEventListener('click', async () => {
       const token = tokenInput.value.trim();
       const repo = repoInput.value.trim();
-      const file = fileInput.files[0];
-
-      if (!token || !repo || !file) {
-        alert('Please fill in all fields: GitHub token, repository name, and select an image.');
+      if (!token || !repo || files.length === 0) {
+        alert('Please fill in all fields and select at least one image.');
         return;
       }
 
       uploadBtn.textContent = 'Uploading...';
       uploadBtn.disabled = true;
+      resultContent.innerHTML = '';
 
-      try {
+      for (const file of files) {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = async () => {
-          const base64Content = reader.result.split(',')[1];
-          const fileName = file.name;
-          const path = `images/${fileName}`;
-          const commitMessage = `Upload ${fileName} via website`;
+        await new Promise(resolve => {
+          reader.onload = async () => {
+            const base64Content = reader.result.split(',')[1];
+            const fileName = file.name;
+            const path = `images/${fileName}`;
+            const commitMessage = `Upload ${fileName} via website`;
 
-          const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `token ${token}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify({
-              message: commitMessage,
-              content: base64Content
-            })
-          });
+            const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/vnd.github.v3+json'
+              },
+              body: JSON.stringify({
+                message: commitMessage,
+                content: base64Content
+              })
+            });
 
-          const data = await response.json();
-
-          if (response.ok) {
-            const url = data.content.download_url;
-            imageUrl.textContent = `Image URL: ${url}`;
-            markdown.textContent = `![${fileName}](${url})`;
-            result.classList.remove('hidden');
-          } else {
-            alert(`Error: ${data.message || 'Failed to upload image'}`);
-          }
-        };
-      } catch (error) {
-        alert(`Error: ${error.message}`);
-      } finally {
-        uploadBtn.textContent = 'Upload Image';
-        uploadBtn.disabled = false;
+            const data = await response.json();
+            if (response.ok) {
+              const url = data.content.download_url;
+              const resultBlock = document.createElement('div');
+              resultBlock.classList.add('mb-2');
+              resultBlock.innerHTML = `
+                <p class="text-gray-700">Image URL: <a href="${url}" target="_blank" class="text-blue-600 underline">${url}</a></p>
+                <p class="text-gray-700 font-mono">![${fileName}](${url})</p>
+              `;
+              resultContent.appendChild(resultBlock);
+            } else {
+              alert(`Error uploading ${fileName}: ${data.message || 'Failed to upload image'}`);
+            }
+            resolve();
+          };
+        });
       }
+
+      result.classList.remove('hidden');
+      uploadBtn.textContent = 'Upload Image(s)';
+      uploadBtn.disabled = false;
     });
   </script>
 </body>
